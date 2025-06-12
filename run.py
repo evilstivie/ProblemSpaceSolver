@@ -14,7 +14,12 @@ async def cli():
 
 
 @cli.command()
-async def run_experiment():
+@click.option('--model', type=str, default='cogito:14b')
+@click.option('--temperature', type=float, default=0.1)
+async def run_experiment(
+    model: str,
+    temperature: float,
+):
     stats = []
     for task in itertools.islice(game24.iter_tasks(), 10):
         config = {
@@ -29,9 +34,15 @@ async def run_experiment():
         client = fastmcp.Client(config)
 
         async with client:
-            answer = await iterative.run(client, task)
+            answer = await iterative.run(
+                client,
+                task,
+                model=model,
+                temperature=temperature,
+            )
 
         is_solved = task.validate(answer)
+        print("IS_SOLVED:", is_solved)
         stats.append((task.input, answer, is_solved))
 
     click.echo(stats)
