@@ -6,17 +6,17 @@ import pandas as pd
 
 
 # 5-shot
-STANDARD_PROMPT = '''Use numbers and basic arithmetic operations (+ - * /) to obtain 24. The solution always exists. You must use all numbers from input set. Give answer as in example.
+STANDARD_PROMPT = '''Use numbers and basic arithmetic operations (+ - * /) to obtain 24. You must use all numbers from input set. REMEMBER: you can use operator multiple times (e.g. "1 + 1 + 1 + 1" if "Input: 1 1 1 1")
 Input: 4 4 6 8
-Answer: (4 + 8) * (6 - 4)
+<answer>(4 + 8) * (6 - 4) = 24</answer>
 Input: 2 9 10 12
-Answer: 2 * 12 * (10 - 9)
+<answer>2 * 12 * (10 - 9) = 24</answer>
 Input: 4 9 10 13
-Answer: (13 - 9) * (10 - 4)
+<answer>(13 - 9) * (10 - 4) = 24</answer>
 Input: 1 4 8 8
-Answer: (8 / 4 + 1) * 8
+<answer>(8 / 4 + 1) * 8 = 24</answer>
 Input: 5 5 5 9
-Answer: 5 + 5 + 5 + 9
+<answer>5 + 5 + 5 + 9 = 24</answer>
 Input: {input}
 '''
 

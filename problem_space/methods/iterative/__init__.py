@@ -9,9 +9,12 @@ from problem_space.tasks import game24
 
 
 INSTRUCTIONS_PROMPT = """INSTRUCTIONS:
+You are professional in reasoning through available tools.
+You structure your thoughts in the problem space.
+
+You heavily rely on available tools, your EVERY step should contain tool calls.
+
 - Be verbose about what are you doing
-- Use cognitive tools to reach your goal
-- Make very atomic steps, use tools
 - ALWAYS wrap your final answer with tags <answer>YOUR ANSWER</answer>
 """
 
@@ -22,7 +25,8 @@ async def run(
     max_iter: int = 200,
     model: str = 'cogito:14b',
     temperature: float = 0.7,
-) -> str:
+    seed: int = 0,
+) -> tuple[str, list[dict[str, str]]]:
     available_tools = []
 
     res = await client.list_tools_mcp()
@@ -36,16 +40,27 @@ async def run(
             }
         }))
 
+    answer = "no answer"
     messages = [
-        {'role': 'user', 'content': INSTRUCTIONS_PROMPT},
+        {'role': 'system', 'content': INSTRUCTIONS_PROMPT},
         {'role': 'user', 'content': task.get_prompt()},
     ]
-    for _ in range(max_iter):
+    for i in range(max_iter):
+        print(f"[{i}/{max_iter}]")
+
         response: ollama.ChatResponse = ollama.chat(
             model,
             messages=messages,
             tools=available_tools,
-            options={'temperature': temperature},
+            options={
+                'temperature': temperature,
+                # 'repeat_penalty': 1.1,
+                'num_predict': 4048,
+                # 'num_ctx': 8096,
+                'seed': seed,
+                # 'top_k': 90,
+                # 'top_p': 0.99,
+            },
         )
         messages.append(response.message.model_dump())
         print(messages[-1])
@@ -53,15 +68,18 @@ async def run(
         if response.message.content is None:
             break
 
-        matches = re.findall(r'<answer>(.*?)</answer>', response.message.content)
+        matches = re.findall(r'<answer>(.*?)<\/answer>', response.message.content, re.DOTALL)
         if len(matches) > 0:
-            return matches[0]
+            answer = matches[0]
+            break
 
         any_tool_failed = False
         if response.message.tool_calls is None or len(response.message.tool_calls) == 0:
-            # messages.append({'role': 'user', 'content': "you MUST call a tool, focus on initial problem"})
+            # messages.append({'role': 'system', 'content': "you MUST call a tool"})
             # print(messages[-1])
-            messages.append({'role': 'user', 'content': 'continue'})
+            # messages.append({'role': 'user', 'content': 'continue'})
+            # print(messages[-1])
+            messages.append({'role': 'user', 'content': 'continue reasoning'})
             print(messages[-1])
             continue
 
@@ -82,14 +100,14 @@ async def run(
                 print(messages[-1])
             except Exception as e:
                 any_tool_failed = True
-                messages.append({'role': 'tool', 'content': f"TOOL CALL FAILED: {str(e)}", 'name': tool.function.name})
+                messages.append({'role': 'tool', 'content': f"{tool.function.name} call failed: {str(e)}"})
                 print(messages[-1])
 
-        # if any_tool_failed:
-        #     messages.append({'role': 'user', 'content': "call a different tool to fix TOOL CALL FAILED. Don't call `reset_problem_space`, focus on initial problem"})
-        #     print(messages[-1])
+        #if any_tool_failed:
+        #    messages.append({'role': 'user', 'content': "fix TOOL CALL FAILED. Don't call `reset_problem_space`, focus on initial problem"})
+        #    print(messages[-1])
         # else:
-        messages.append({'role': 'user', 'content': 'continue'})
-        print(messages[-1])
+        #     messages.append({'role': 'user', 'content': 'continue reasoning'})
+        #     print(messages[-1])
 
-    return messages[-1]["content"]
+    return answer, messages
