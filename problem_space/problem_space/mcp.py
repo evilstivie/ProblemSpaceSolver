@@ -17,8 +17,11 @@ def create_problem_space_map(
     """
     You MUST first call the `create_problem_space_map` tool to set a new goal.
     This is crucial to build a correct problem space map and estimate distance to the goal.
+    Add all the requirements and constraints to the goal description, based on this goal
+    description the distance is estimated. You should make the goal description clear and verifiable.
 
-    You MUST heavily rely on problem space for reasoning
+    Good goal: "Achieve X. Use Y. Always should be Z. Ban T"
+    Bad goal: "Achieve X"
     """
     REGISTRY.reset(new_goal)
 
@@ -67,7 +70,7 @@ def add_operator(
 def add_transition(
     from_state_id: Annotated[int, Field(description="ID of state from CognitiveMap which should be previously created with `add_transition` or 0")],
     operator_id: Annotated[int, Field(description="ID of operator from CognitiveMap which should be previously created with `add_operator`")],
-    new_state_description: Annotated[str, Field(description="Concise new state meaning")],
+    new_state_description: Annotated[str, Field(description="Concise new state meaning. Should be evaluated with respect to the goal")],
 ) -> models.StateAdded:
     """
     State is a position in problem-space. The transition encodes a VALID shift from one state to another using operator.
@@ -76,10 +79,8 @@ def add_transition(
 
     Take EXACTLY ONE state from map and operator and pass their EXACT IDs to create transition to a new state.
 
-    HINT: If you encounter the same distance or states multiple times, try take a different directions using `get_problem_space_map`.
-
     RETURNS: new state ID and estimated distance to goal
-    You MUST make decisions based on `distance_to_goal`
+    You MUST make decisions based on `distance_to_goal`. If distance is constantly high you may want to add new operator.
     You can further use this new state ID in `add_transition`
 
     EXAMPLES:
@@ -107,8 +108,6 @@ def get_problem_space_map() -> models.CognitiveMap:
     - you want to check your goal
     - you want to overview directions you have visited
     - you want to change directions
-
-    HINT: If you encounter the same distance or states multiple times, try take a different directions using `get_problem_space_map`.
 
     EXAMPLES:
     - args: {}

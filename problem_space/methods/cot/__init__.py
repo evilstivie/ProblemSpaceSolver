@@ -24,22 +24,34 @@ async def run(
         {'role': 'user', 'content': task.get_prompt()},
     ]
     for _ in range(max_iter):
-        response: ollama.ChatResponse = ollama.chat(
+
+        response_text = ""
+        for part in ollama.chat(
             model,
             messages=messages,
             options={
                 'temperature': temperature,
-                # 'repeat_penalty': 1.1,
-                # 'num_predict': 512,
+                'repeat_penalty': 1.1,
+                'top_p': 0.7,
+                'top_k': 50,
             },
-        )
-        messages.append(response.message.model_dump())
-        print(messages[-1])
+            stream=True,
+        ):
+            if not part.message.content:
+                break
 
-        if response.message.content is None:
+            response_text += part.message.content or ''
+            print(part.message.content, end='', flush=True)
+            if len(response_text) > 10000:
+                response_text += "<interrupted>"
+                break
+
+        messages.append({'role': 'assistant', 'content': response_text})
+
+        if not response_text:
             break
 
-        matches = re.findall(r'<answer>(.*?)<\/answer>', response.message.content, re.DOTALL)
+        matches = re.findall(r'<answer>(.*?)<\/answer>', response_text, re.DOTALL)
         if len(matches) > 0:
             answer = matches[0]
             break

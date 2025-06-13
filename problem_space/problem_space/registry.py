@@ -14,12 +14,11 @@ A lower number means it's closer to the `goal_description`.
 
 Be very strict at checking distance is 0. This should ONLY mean that goal is achieved, e.g. state equivalent to goal.
 
-Max distance is 100.
+Max distance is 100.0.
 
 EXAMPLES:
 - goal is to connect nine dots arranged in a 3x3 grid using four straight lines, without lifting your pen and without retracing any lines (9-dot-problem)
   state "angles connected with line" has bigger distance than "centers of near sides connected" because second state will break the limit: Many people get stuck because they subconsciously limit themselves to drawing lines within the boundaries of the square formed by the dots
-
 - goal is to Use numbers and basic arithmetic operations (+ - * /) to obtain 24.
   state that uses new number ordering may be closer to goal than a lot of existing states with the same number ordering.
 """
@@ -36,7 +35,7 @@ class ProblemSpaceRegistry:
                 models.CognitiveState(
                     id=0,
                     description="empty state",
-                    distance_to_goal=100,
+                    distance_to_goal=100.0,
                 )
             ],
             operators=[],
@@ -48,36 +47,30 @@ class ProblemSpaceRegistry:
         if self.m.goal_description == "unknown":
             raise ValueError("goal is unknown, call `create_problem_space_map` first")
 
-        distances = []
-        for _ in range(3):
-            class Answer(BaseModel):
-                distance: float
+        class Answer(BaseModel):
+            distance: float
 
-            messages = [
-                {
-                    'role': 'system',
-                    'content': DISTANCE_EVAL_INSTRUCTIONS,
-                },
-                {
-                    'role': 'user',
-                    'content': f"State to estimate: {item_to_evaluate}\nGoal: {self.m.goal_description}\nFull map:\n{self.m.model_dump_json(indent=2)}",
-                },
-            ]
+        messages = [
+            {
+                'role': 'system',
+                'content': DISTANCE_EVAL_INSTRUCTIONS,
+            },
+            {
+                'role': 'user',
+                'content': f"STATE:\n{item_to_evaluate}\n\nGOAL:\n{self.m.goal_description}\n\nFULL MAP:\n{self.m.model_dump_json(indent=2)}",
+            },
+        ]
 
-            response = ollama.chat(
-                model='cogito:14b',
-                messages=messages,
-                format=Answer.model_json_schema(),
-                options={
-                    'temperature': 0.0,
-                    'num_predict': 512,
-                },
-            )
-            distances.append(Answer.model_validate_json(response.message.content or '').distance)
-
-        distances.sort()
-
-        return distances[1]
+        response = ollama.chat(
+            model='llama3.1:8b',
+            messages=messages,
+            format=Answer.model_json_schema(),
+            options={
+                'temperature': 0.0,
+                'num_predict': 512,
+            },
+        )
+        return Answer.model_validate_json(response.message.content or '').distance
 
     def add_state(self, description: str) -> models.StateAdded:
         if self.m.goal_description == "unknown":
