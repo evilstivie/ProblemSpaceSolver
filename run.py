@@ -67,6 +67,7 @@ async def run_experiment(
                 task,
                 model=model,
                 temperature=0.5,
+                max_iter=3,
             )
 
             is_solved = task.validate(answer)

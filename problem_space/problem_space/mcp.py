@@ -12,15 +12,15 @@ REGISTRY = registry.ProblemSpaceRegistry()
 
 @mcp.tool()
 def create_problem_space_map(
-    new_goal: Annotated[str, Field(description="Goal you want to achieve when solving a problem")],
+    task_description: Annotated[str, Field(description="Full task description with success criteria and constraints")],
 ) -> None:
     """
-    You MUST first call the `create_problem_space_map` tool to set a new goal.
+    You MUST first call the `create_problem_space_map` tool to set a new task.
     This is crucial to build a correct problem space map and estimate distance to the goal.
 
     You MUST heavily rely on problem space for reasoning
     """
-    REGISTRY.reset(new_goal)
+    REGISTRY.reset(task_description)
 
 
 # @mcp.tool()
@@ -36,7 +36,10 @@ def add_operator(
     description: Annotated[str, Field(description="Concise operator meaning. MUST contain a verb")],
 ) -> models.OperatorAdded:
     """
-    Operator is an ACTION which can be performed on states in problem-space.
+    Operator is a HEURISTIC which can be performed on states in problem-space.
+    FIRST add more simple heuristics like "do X for all" and only then add more specific and more low-level like "change X to Y at position Z"
+
+    You should call `add_transition` to explore new heuristics.
 
     If map does not contain action you can perform, add it with tool.
     RETURNS: new operator ID. You can further use this operator ID in `add_transition`
@@ -71,15 +74,14 @@ def add_transition(
 ) -> models.StateAdded:
     """
     State is a position in problem-space. The transition encodes a VALID shift from one state to another using operator.
+    FIRST add more simple states which encode full picture and only then add more specific.
 
-    IMPORTANT: use IDs which are returned from `add_operator` or `add_transition` or `get_problem_space_map`
+    You should call `add_transition` to explore new states.
 
-    Take EXACTLY ONE state from map and operator and pass their EXACT IDs to create transition to a new state.
-
-    HINT: If you encounter the same distance or states multiple times, try take a different directions using `get_problem_space_map`.
+    IMPORTANT: use IDs which are returned from `add_operator` or `add_transition` or `get_problem_space_map`. Take EXACTLY ONE state from map and operator and pass their EXACT IDs to create transition to a new state.
 
     RETURNS: new state ID and estimated distance to goal
-    You MUST make decisions based on `distance_to_goal`
+    You MUST make decisions based on `distance_to_goal`. Distance is estimate, not precise, distance of 0.0 may mean that you need one additional small step.
     You can further use this new state ID in `add_transition`
 
     EXAMPLES:
@@ -87,6 +89,8 @@ def add_transition(
       returns: {"id": 40, "distance_to_goal": 14}
     - args: {"new_state_description": "hanoi disks: [A,B] [C] []", "from_state_id": 2, "operator_id": 20}
       returns: {"id": 2, "distance_to_goal": 70}
+
+    HINT: If you encounter the same distance or states multiple times, try take a different directions using `get_problem_space_map`.
 
     ERRORS:
     - goal is not set, this method is called before `create_problem_space_map`
@@ -100,7 +104,7 @@ def add_transition(
 def get_problem_space_map() -> models.CognitiveMap:
     """
     Problem space maps your task progress. Get cognitive map with distances to goals.
-    Carefully analyze the `CognitiveMap` returned by the tool. You MUST make decisions based on `distance_to_goal` in observed map.
+    Carefully analyze the `CognitiveMap` returned by the tool. You MUST make decisions based on `distance_to_goal` in observed map. Distance is an estimate, not precise, distance of 0.0 may mean that you need one additional small step.
 
     Useful when:
     - you think that there is no solution
