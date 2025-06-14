@@ -33,9 +33,14 @@ async def run_experiment(
         for p in range(3):
             config = {
                 "mcpServers": {
-                    "cognitive_map": {
+                    "problem_space": {
                         "command": sys.executable,
                         "args": [__file__, "run-model-mcp"],
+                        "env": {},
+                    },
+                    "calculator": {
+                        "command": sys.executable,
+                        "args": [__file__, "run-calculator-mcp"],
                         "env": {},
                     },
                 }
@@ -66,7 +71,7 @@ async def run_experiment(
             answer, messages = await cot.run(
                 task,
                 model=model,
-                temperature=0.5,
+                temperature=0.3,
                 max_iter=3,
             )
 
@@ -86,6 +91,12 @@ async def run_experiment(
 @cli.command()
 async def run_model_mcp():
     from problem_space.problem_space.mcp import mcp
+    await mcp.run_async()
+
+
+@cli.command()
+async def run_calculator_mcp():
+    from problem_space.tools.calculator import mcp
     await mcp.run_async()
 
 

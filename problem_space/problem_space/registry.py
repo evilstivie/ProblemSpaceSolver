@@ -9,13 +9,19 @@ INSTRUCTIONS:
 Your sole function is to estimate distance to goal.
 A lower number means it's closer to the `goal_description`.
 
+Distance is estimate of how many low-level transitions you need to make from new state to achieve the goal.
+Don't simply substract 1, analyze if new state is more likely to reach the goal than previous.
+Don't make very big changes in distance compared to previous distance.
+
+State which uses some incorrect objects which are not stated in goal SHOULD have a very big distance because it is formally incorrect.
+
 Be very strict at checking distance is 0. This should ONLY mean that goal is achieved, e.g. state equivalent to goal.
 
-Max distance is 100. Min distance is 0.
-
-EXAMPLE:
-- For goal "Use numbers and basic arithmetic operations (+ - * /) to obtain 24." the state which is simpler and numerically closer to 24. Evaluate if given numbers can reach 24 (smaller distance means more likely) with small number of transformations.
+Max distance is 100.
 """
+
+#  For example, if previous distance is 100, new distance will unlikely be 10.
+
 
 
 class ProblemSpaceRegistry:
@@ -23,17 +29,17 @@ class ProblemSpaceRegistry:
         self.reset("unknown")
 
     def reset(self, goal: str):
-        self.m = models.CognitiveMap(
+        self.m = models.ProblemSpaceMap(
             goal_description=goal,
             states=[
-                models.CognitiveState(
+                models.State(
                     id=0,
                     description="nothing",
                     distance_to_goal=100,
                 )
             ],
-            operators=[],
-            applied_actions=[],
+            heuristics=[],
+            transition_history=[],
         )
         self.history = []
 
@@ -41,11 +47,11 @@ class ProblemSpaceRegistry:
         self,
         previous_state: str,
         previous_distance: float,
-        operator_description: str,
+        heuristic_description: str,
         new_state: str,
     ) -> float:
         if self.m.goal_description == "unknown":
-            raise ValueError("goal is unknown, call `create_problem_space_map` first")
+            raise ValueError("goal is unknown, call `start_solving_problem` first")
 
         class Answer(BaseModel):
             distance: float
@@ -57,23 +63,23 @@ class ProblemSpaceRegistry:
             },
             {
                 'role': 'user',
-                'content': f"""Previous state (distance {previous_distance}):
-{previous_state}
-
-Heuristics applied:
-{operator_description}
-
-State to estimate:
-{new_state}
-
-Original Goal for the solver:
+                'content': f"""Target state:
 "{self.m.goal_description}"
+
+State to estimate new distance:
+"{new_state}"
+
+Previous state (previous distance = {previous_distance}):
+"{previous_state}"
+
+Heuristic used:
+"{heuristic_description}"
 """
             },
         ]
 
         response = ollama.chat(
-            model='llama3.1:8b',
+            model='cogito:14b',
             messages=messages,
             format=Answer.model_json_schema(),
             options={
@@ -83,63 +89,69 @@ Original Goal for the solver:
         )
         return Answer.model_validate_json(response.message.content or '').distance
 
-    def add_operator(self, description: str) -> models.OperatorAdded:
+    def add_heuristic(self, description: str) -> models.HeuristicAdded | models.HeuristicAlreadyExistsError:
         if self.m.goal_description == "unknown":
-            raise ValueError("goal is unknown, call `create_problem_space_map` first")
+            raise ValueError("goal is unknown, call `start_solving_problem` first")
 
-        for operator in self.m.operators:
-            if operator.description == description:
-                raise ValueError(f"operator with `description`=\"{description}\" already exists and has ID = {operator.id}")
+        for heuristic in self.m.heuristics:
+            if heuristic.description == description:
+                return models.HeuristicAlreadyExistsError(existing_id=heuristic.id)
+                # raise ValueError(f"heuristic with `description`=\"{description}\" already exists and has ID = {heuristic.id}")
 
-        op_id = len(self.m.operators)
-        self.m.operators.append(models.CognitiveOperator(
+        op_id = len(self.m.heuristics)
+        self.m.heuristics.append(models.Heuristic(
             id=op_id,
             description=description,
         ))
-        return models.OperatorAdded(
+        return models.HeuristicAdded(
             id=op_id,
         )
 
-    def add_transition(self, from_state_id: int, operator_id: int, new_state_description: str) -> models.StateAdded:
+    def add_transition(self, from_state_id: int, heuristic_id: int, new_state_description: str) -> models.StateAdded | models.StateAlreadyExistsError:
         if self.m.goal_description == "unknown":
-            raise ValueError("goal is unknown, call `create_problem_space_map` first")
+            raise ValueError("goal is unknown, call `start_solving_problem` first")
         if from_state_id >= len(self.m.states):
             raise ValueError(f"Origin state {from_state_id} not found. Use only existing states. First add state with `add_transition` and use ID returned from that function call")
-        if operator_id >= len(self.m.operators):
-            raise ValueError(f"Operator '{operator_id}' not found. First add operator with `add_operator` and use ID returned from that function call")
+        if heuristic_id >= len(self.m.heuristics):
+            raise ValueError(f"Heuristic '{heuristic_id}' not found. First add heuristic with `add_heuristic` and use ID returned from that function call")
 
         for state in self.m.states:
             if state.description == new_state_description:
-                raise ValueError(f"state with `description`=\"{new_state_description}\" already exists and has ID = {state.id}")
+                return models.StateAlreadyExistsError(
+                    existing_id=state.id,
+                    distance_to_goal=state.distance_to_goal,
+                )
+
+                # raise ValueError(f"state with `description`=\"{new_state_description}\" already exists and has ID = {state.id}")
 
         state_id = len(self.m.states)
         distance = self._evaluate_distance_with_llm(
             previous_state=self.m.states[from_state_id].description,
             previous_distance=self.m.states[from_state_id].distance_to_goal,
-            operator_description=self.m.operators[operator_id].description,
+            heuristic_description=self.m.heuristics[heuristic_id].description,
             new_state=new_state_description,
         )
-        self.m.states.append(models.CognitiveState(
+        state = models.State(
             id=state_id,
             description=new_state_description,
             distance_to_goal=distance,
-        ))
-        return models.StateAdded(
-            id=state_id,
-            distance_to_goal=distance,
         )
+        self.m.states.append(state)
 
-        new_state = self.add_state(new_state_description)
-        self.m.applied_actions.append(
+        self.m.transition_history.append(
             models.Transition(
                 from_state_id=from_state_id,
-                to_state_id=new_state.id,
-                operator_id=operator_id,
+                to_state_id=state.id,
+                heuristic_id=heuristic_id,
+                # distance_delta=state.distance_to_goal-self.m.states[from_state_id].distance_to_goal,
             )
         )
-        return new_state
+        return models.StateAdded(
+            id=state.id,
+            distance_to_goal=state.distance_to_goal,
+        )
 
-    def get_map(self) -> models.CognitiveMap:
+    def get_map(self) -> models.ProblemSpaceMap:
         if self.m.goal_description == "unknown":
-            raise ValueError("goal is unknown, call `create_problem_space_map` first")
+            raise ValueError("goal is unknown, call `start_solving_problem` first")
         return self.m

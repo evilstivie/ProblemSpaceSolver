@@ -1,13 +1,15 @@
+import typing
+
 from pydantic import BaseModel, Field
 
 
-class CognitiveOperator(BaseModel):
-    id: int = Field(description="Operator unique ID")
-    description: str = Field(description="Human-readable operator description")
+class Heuristic(BaseModel):
+    id: int = Field(description="Heuristic unique ID")
+    description: str = Field(description="Human-readable heuristic description")
 
 
-class CognitiveState(BaseModel):
-    id: int = Field(description="Cognitive state unique ID")
+class State(BaseModel):
+    id: int = Field(description="State unique ID")
     description: str = Field(description="Human-readable state description")
     distance_to_goal: float = Field(description="Number representing estimated distance to goal")
 
@@ -15,20 +17,32 @@ class CognitiveState(BaseModel):
 class Transition(BaseModel):
     from_state_id: int = Field(description="ID of state to transition from")
     to_state_id: int = Field(description="ID of state to transition to")
-    operator_id: int = Field(description="ID of operator to use")
+    heuristic_id: int = Field(description="ID of heuristic to use")
+    # distance_delta: float
 
 
-class CognitiveMap(BaseModel):
+class ProblemSpaceMap(BaseModel):
     goal_description: str
-    states: list[CognitiveState]
-    operators: list[CognitiveOperator]
-    applied_actions: list[Transition]
+    states: list[State]
+    heuristics: list[Heuristic]
+    transition_history: list[Transition]
 
 
 class StateAdded(BaseModel):
-    id: int = Field(description="Cognitive state unique ID")
+    id: int = Field(description="State unique ID")
     distance_to_goal: float = Field(description="Number representing estimated distance to goal")
 
 
-class OperatorAdded(BaseModel):
-    id: int = Field(description="Cognitive operator unique ID")
+class StateAlreadyExistsError(BaseModel):
+    error: str = Field(default="state already exists")
+    existing_id: int = Field(description="ID of state which already exists")
+    distance_to_goal: float = Field(description="Number representing estimated distance to goal")
+
+
+class HeuristicAdded(BaseModel):
+    id: int = Field(description="Heuristic unique ID")
+
+
+class HeuristicAlreadyExistsError(BaseModel):
+    error: str = Field(default="heuristic already exists")
+    existing_id: int = Field(description="ID of heuristic which already exists")

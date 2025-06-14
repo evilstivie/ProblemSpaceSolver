@@ -10,9 +10,8 @@ from problem_space.tasks import game24
 
 INSTRUCTIONS_PROMPT = """INSTRUCTIONS:
 You are professional in reasoning through available tools.
-You structure your thoughts in the problem space.
 You heavily rely on available tools, your EVERY step should contain tool calls.
-Before solving a problem you form strict success criteria.
+Before solving a problem you form strict success criteria and complete set of constraints.
 Your reasoning contain ONLY tool calls, no other text.
 
 - Be verbose about what are you doing
@@ -88,13 +87,13 @@ async def run(
         if not response_text and not tool_calls:
             break
 
-        matches = re.findall(r'<answer>(.*?)<\/answer>', response_text, re.DOTALL)
-        if len(matches) > 0:
-            answer = matches[-1]
-            break
-
         any_tool_failed = False
         if len(tool_calls) == 0:
+            matches = re.findall(r'<answer>(.*?)<\/answer>', response_text, re.DOTALL)
+            if len(matches) > 0:
+                answer = matches[-1]
+                break
+
             # messages.append({'role': 'system', 'content': "you MUST call a tool"})
             # print(messages[-1])
             # messages.append({'role': 'user', 'content': 'continue'})
@@ -114,13 +113,14 @@ async def run(
                     'content': json.dumps({
                         'function_name': tool.function.name,
                         'request': tool.function.arguments,
-                        'response': output[0].text if output else '',
+                        'response': json.loads(output[0].text) if output else '',
                     }),
+                    'name': tool.function.name,
                 })
                 print(messages[-1])
             except Exception as e:
                 any_tool_failed = True
-                messages.append({'role': 'tool', 'content': f"{tool.function.name} call failed: {str(e)}"})
+                messages.append({'role': 'tool', 'content': f"{tool.function.name} call failed: {str(e)}", 'name': tool.function.name})
                 print(messages[-1])
 
         messages.append({'role': 'system', 'content': 'continue, use tool responses'})
