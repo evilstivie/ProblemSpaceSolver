@@ -35,6 +35,7 @@ def start_solving_problem(
 @mcp.tool()
 def add_heuristic(
     description: Annotated[str, Field(description="Concise heuristic meaning. MUST contain a verb")],
+    complexity: Annotated[int, Field(description="Measure of how this heuristic would complicate the answer")]
 ) -> models.HeuristicAdded | models.HeuristicAlreadyExistsError:
     """
     heuristic is an operator which can be performed on states in problem-space.
@@ -46,17 +47,19 @@ def add_heuristic(
     RETURNS: new heuristic ID. You can further use this heuristic ID in `add_transition`
 
     EXAMPLES:
-    - args: {"description": "swap numbers"}
+    - args: {"description": "swap numbers", "complexity": 1}
       returns: {"id": 42}
-    - args: {"description": "put +"}
+    - args: {"description": "put +", "complexity": 1}
       returns: {"id": 12}
-    - args: {"description": "rotate picture"}
+    - args: {"description": "put /", "complexity": 10}
+      returns: {"id": 12}
+    - args: {"description": "rotate picture", "complexity": 5}
       returns: {"id": 48}
 
     ERRORS:
     - goal is not set, this method is called before `start_solving_problem`
     """
-    return REGISTRY.add_heuristic(description)
+    return REGISTRY.add_heuristic(description, complexity)
 
 
 # @mcp.tool()
@@ -75,12 +78,14 @@ def add_transition(
 ) -> models.StateAdded | models.StateAlreadyExistsError:
     """
     State is a position in problem-space. The transition encodes a VALID shift from one state to a NEW state using heuristic. There is no need to add the same state multiple times via this tool.
-    FIRST add more simple states which encode full picture and only then add more specific.
+    FIRST add more simple states which encode full picture and only then add more specific using more complex heuristics.
 
     You should call `add_transition` to explore new states.
-    You MUST make decisions based on returned `distance_to_goal`. Low distance means you need make a small transition, slightly changing state. Big distance means you need make a big transition, consider new heuristic or another state with lower distance. Distance is estimate, not precise, always double-check yourself.
+    You MUST make decisions based on returned `distance_to_goal`. Low distance means you need make a small transition, slightly changing state. Big distance means you likely need make a big transition, consider new heuristic or another state with lower distance. Distance is estimate, not precise, always double-check yourself.
 
-    IMPORTANT: use IDs which are returned from `add_heuristic` or `add_transition` or `get_problem_space_map`. Take EXACTLY ONE state from map and heuristic and pass their EXACT IDs to create transition to a new state.
+    Don't make repeating transitions, analyze big picture with `get_insight`
+
+    IMPORTANT: use IDs which are returned from `add_heuristic` or `add_transition` or `get_insight`. Take EXACTLY ONE state from map and heuristic and pass their EXACT IDs to create transition to a new state.
 
     RETURNS: new state ID and estimated distance to goal
     You can further use this new state ID in `add_transition`
@@ -91,7 +96,7 @@ def add_transition(
     - args: {"new_state_description": "hanoi disks: [A,B] [C] []", "from_state_id": 2, "heuristic_id": 20}
       returns: {"id": 2, "distance_to_goal": 70}
 
-    HINT: If you encounter the same distance or states multiple times, try take a different directions using `get_problem_space_map`.
+    HINT: If you encounter the same distance or states multiple times, try take a different directions using `get_insight`.
 
     ERRORS:
     - goal is not set, this method is called before `start_solving_problem`
@@ -110,6 +115,7 @@ def get_insight() -> models.ProblemSpaceMap:
     You MUST make decisions based on `distance_to_goal` of states. Low distance means you need make a small transition, slightly changing state. Big distance means you need make a big transition, consider new heuristic or another state with lower distance. Distance is estimate, not precise, always double-check yourself.
 
     Last item in `transition_history` represents your current state.
+    If you are making repeating transitions, analyze big picture with `get_insight`.
 
     Useful when:
     - you think that there is no solution
@@ -117,7 +123,7 @@ def get_insight() -> models.ProblemSpaceMap:
     - you want to overview directions you have visited
     - you want to change directions
 
-    HINT: If you encounter the same distance or states multiple times, try take a different directions using `get_problem_space_map`.
+    HINT: If you encounter the same distance or states multiple times, try take a different directions using `get_insight`.
 
     EXAMPLES:
     - args: {}

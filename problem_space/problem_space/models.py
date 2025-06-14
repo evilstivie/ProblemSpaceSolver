@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class Heuristic(BaseModel):
     id: int = Field(description="Heuristic unique ID")
     description: str = Field(description="Human-readable heuristic description")
+    complexity: int = Field(description="Measure of how this heuristic complicates the state")
 
 
 class State(BaseModel):

@@ -6,18 +6,12 @@ from . import models
 
 DISTANCE_EVAL_INSTRUCTIONS = """
 INSTRUCTIONS:
-Your sole function is to estimate distance to goal.
-A lower number means it's closer to the `goal_description`.
-
-Distance is estimate of how many low-level transitions you need to make from new state to achieve the goal.
-Don't simply substract 1, analyze if new state is more likely to reach the goal than previous.
-Don't make very big changes in distance compared to previous distance.
-
-State which uses some incorrect objects which are not stated in goal SHOULD have a very big distance because it is formally incorrect.
-
-Be very strict at checking distance is 0. This should ONLY mean that goal is achieved, e.g. state equivalent to goal.
-
-Max distance is 100.
+1. Your sole function is to estimate distance to goal.
+2. A lower number means it's closer to the `goal_description`.
+3. Distance is estimate of how the new state is more likely to reach the goal than the previous.
+4. State which uses some incorrect objects which are not stated in goal SHOULD have a very big distance because it is formally incorrect.
+5. Be very strict at checking distance is 0. This should ONLY mean that goal is achieved, e.g. state equivalent to goal.
+6. Max distance is 100.
 """
 
 #  For example, if previous distance is 100, new distance will unlikely be 10.
@@ -66,14 +60,14 @@ class ProblemSpaceRegistry:
                 'content': f"""Target state:
 "{self.m.goal_description}"
 
-State to estimate new distance:
-"{new_state}"
-
 Previous state (previous distance = {previous_distance}):
 "{previous_state}"
 
 Heuristic used:
 "{heuristic_description}"
+
+New state (distance = ?):
+"{new_state}"
 """
             },
         ]
@@ -89,7 +83,7 @@ Heuristic used:
         )
         return Answer.model_validate_json(response.message.content or '').distance
 
-    def add_heuristic(self, description: str) -> models.HeuristicAdded | models.HeuristicAlreadyExistsError:
+    def add_heuristic(self, description: str, complexity: int) -> models.HeuristicAdded | models.HeuristicAlreadyExistsError:
         if self.m.goal_description == "unknown":
             raise ValueError("goal is unknown, call `start_solving_problem` first")
 
@@ -102,6 +96,7 @@ Heuristic used:
         self.m.heuristics.append(models.Heuristic(
             id=op_id,
             description=description,
+            complexity=complexity,
         ))
         return models.HeuristicAdded(
             id=op_id,

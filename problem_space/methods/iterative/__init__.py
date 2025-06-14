@@ -9,13 +9,11 @@ from problem_space.tasks import game24
 
 
 INSTRUCTIONS_PROMPT = """INSTRUCTIONS:
-You are professional in reasoning through available tools.
-You heavily rely on available tools, your EVERY step should contain tool calls.
-Before solving a problem you form strict success criteria and complete set of constraints.
-Your reasoning contain ONLY tool calls, no other text.
-
-- Be verbose about what are you doing
-- ALWAYS wrap your final answer with tags <answer>YOUR ANSWER</answer>. Before giving answer you always verify it against criteria.
+1. You are professional in reasoning through available tools.
+2. You heavily rely on available tools, your EVERY step should contain tool calls.
+3. Before solving a problem you form strict success criteria and complete set of constraints.
+4. Your reasoning contain ONLY tool calls, no other text.
+5. ALWAYS wrap your final answer with tags <answer>YOUR ANSWER</answer>. Before giving answer you always verify it against criteria.
 """
 
 
@@ -58,19 +56,16 @@ async def run(
             options={
                 'temperature': temperature,
                 # 'repeat_penalty': 1.1,
-                'num_predict': 32000,
+                # 'num_predict': 32000,
                 # 'num_ctx': 8096,
-                'seed': seed,
+                # 'seed': seed,
                 # 'top_k': 90,
                 # 'top_p': 0.99,
             },
             stream=True,
         ):
             if part.message.content is None and not part.message.tool_calls:
-                num_empty += 1
-                if num_empty == 5:
-                    break
-                continue
+                break
 
             response_text += part.message.content or ''
             print(part.message.content, end='', flush=True)
@@ -93,6 +88,12 @@ async def run(
             if len(matches) > 0:
                 answer = matches[-1]
                 break
+
+            # matches = re.findall(r'<more\/>', response_text, re.DOTALL)
+            # if len(matches) > 0:
+            #     continue
+
+            continue
 
             # messages.append({'role': 'system', 'content': "you MUST call a tool"})
             # print(messages[-1])
@@ -123,8 +124,22 @@ async def run(
                 messages.append({'role': 'tool', 'content': f"{tool.function.name} call failed: {str(e)}", 'name': tool.function.name})
                 print(messages[-1])
 
-        messages.append({'role': 'system', 'content': 'continue, use tool responses'})
-        print(messages[-1])
+        # messages.append({'role': 'system', 'content': 'continue, use tool responses'})
+        # print(messages[-1])
+
+    output = await client.call_tool("problem_space_get_insight", {})
+    if output and not isinstance(output[0], mcp.types.TextContent):
+        raise ValueError(f'cannot parse tool response: {str(output)}')
+
+    messages.append({
+        'role': 'tool',
+        'content': json.dumps({
+            'function_name': "problem_space_get_insight",
+            'request': {},
+            'response': json.loads(output[0].text) if output else '',
+        }),
+        'name': "problem_space_get_insight",
+    })
 
         #if any_tool_failed:
         #    messages.append({'role': 'user', 'content': "fix TOOL CALL FAILED. Don't call `reset_problem_space`, focus on initial problem"})
