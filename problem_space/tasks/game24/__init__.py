@@ -7,7 +7,9 @@ import pandas as pd
 
 # 5-shot
 STANDARD_PROMPT = '''Use numbers and basic arithmetic operations (+ - * /) to obtain 24.
-You need to use all the numbers from Input in their original quantity.
+You MUST use all the numbers from Input in their original quantity.
+You MAY use one operator multiple times (e.g. use '+' 3 times in expression).
+Solution always exists.
 Input: 4 4 6 8
 <answer>(4 + 8) * (6 - 4) = 24</answer>
 Input: 2 9 10 12

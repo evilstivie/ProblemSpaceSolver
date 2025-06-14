@@ -32,7 +32,7 @@ class ProblemSpaceRegistry:
                     distance_to_goal=100,
                 )
             ],
-            heuristics=[],
+            operators=[],
             transition_history=[],
         )
         self.history = []
@@ -41,7 +41,7 @@ class ProblemSpaceRegistry:
         self,
         previous_state: str,
         previous_distance: float,
-        heuristic_description: str,
+        operator_description: str,
         new_state: str,
     ) -> float:
         if self.m.goal_description == "unknown":
@@ -63,9 +63,6 @@ class ProblemSpaceRegistry:
 Previous state (previous distance = {previous_distance}):
 "{previous_state}"
 
-Heuristic used:
-"{heuristic_description}"
-
 New state (distance = ?):
 "{new_state}"
 """
@@ -83,35 +80,43 @@ New state (distance = ?):
         )
         return Answer.model_validate_json(response.message.content or '').distance
 
-    def add_heuristic(self, description: str, complexity: int) -> models.HeuristicAdded | models.HeuristicAlreadyExistsError:
+    def add_operator(self, description: str, complexity: int) -> models.OperatorAdded | models.OperatorAlreadyExistsError:
         if self.m.goal_description == "unknown":
             raise ValueError("goal is unknown, call `start_solving_problem` first")
 
-        for heuristic in self.m.heuristics:
-            if heuristic.description == description:
-                return models.HeuristicAlreadyExistsError(existing_id=heuristic.id)
-                # raise ValueError(f"heuristic with `description`=\"{description}\" already exists and has ID = {heuristic.id}")
+        for operator in self.m.operators:
+            if operator.description == description:
+                return models.OperatorAlreadyExistsError(existing_id=operator.id)
+                # raise ValueError(f"operator with `description`=\"{description}\" already exists and has ID = {operator.id}")
 
-        op_id = len(self.m.heuristics)
-        self.m.heuristics.append(models.Heuristic(
+        op_id = len(self.m.operators)
+        self.m.operators.append(models.Operator(
             id=op_id,
             description=description,
             complexity=complexity,
         ))
-        return models.HeuristicAdded(
+        return models.OperatorAdded(
             id=op_id,
         )
 
-    def add_transition(self, from_state_id: int, heuristic_id: int, new_state_description: str) -> models.StateAdded | models.StateAlreadyExistsError:
+    def add_transition(self, from_state_id: int, operator_id: int, new_state_description: str) -> models.StateAdded | models.StateAlreadyExistsError:
         if self.m.goal_description == "unknown":
             raise ValueError("goal is unknown, call `start_solving_problem` first")
         if from_state_id >= len(self.m.states):
             raise ValueError(f"Origin state {from_state_id} not found. Use only existing states. First add state with `add_transition` and use ID returned from that function call")
-        if heuristic_id >= len(self.m.heuristics):
-            raise ValueError(f"Heuristic '{heuristic_id}' not found. First add heuristic with `add_heuristic` and use ID returned from that function call")
+        if operator_id >= len(self.m.operators):
+            raise ValueError(f"Operator '{operator_id}' not found. First add operator with `add_operator` and use ID returned from that function call")
 
         for state in self.m.states:
             if state.description == new_state_description:
+                self.m.transition_history.append(
+                    models.Transition(
+                        from_state_id=from_state_id,
+                        to_state_id=state.id,
+                        operator_id=operator_id,
+                        is_new=False
+                    )
+                )
                 return models.StateAlreadyExistsError(
                     existing_id=state.id,
                     distance_to_goal=state.distance_to_goal,
@@ -123,7 +128,7 @@ New state (distance = ?):
         distance = self._evaluate_distance_with_llm(
             previous_state=self.m.states[from_state_id].description,
             previous_distance=self.m.states[from_state_id].distance_to_goal,
-            heuristic_description=self.m.heuristics[heuristic_id].description,
+            operator_description=self.m.operators[operator_id].description,
             new_state=new_state_description,
         )
         state = models.State(
@@ -137,7 +142,8 @@ New state (distance = ?):
             models.Transition(
                 from_state_id=from_state_id,
                 to_state_id=state.id,
-                heuristic_id=heuristic_id,
+                operator_id=operator_id,
+                is_new=True
                 # distance_delta=state.distance_to_goal-self.m.states[from_state_id].distance_to_goal,
             )
         )

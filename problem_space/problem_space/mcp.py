@@ -25,26 +25,26 @@ def start_solving_problem(
 
 
 # @mcp.tool()
-# def get_heuristic(id: int) -> models.Cognitiveheuristic:
+# def get_operator(id: int) -> models.Cognitiveoperator:
 #     """
-#     heuristic is an ACTION which can be performed on states in problem-space
+#     operator is an ACTION which can be performed on states in problem-space
 #     """
-#     return REGISTRY.get_map().heuristics[id]
+#     return REGISTRY.get_map().operators[id]
 
 
 @mcp.tool()
-def add_heuristic(
-    description: Annotated[str, Field(description="Concise heuristic meaning. MUST contain a verb")],
-    complexity: Annotated[int, Field(description="Measure of how this heuristic would complicate the answer")]
-) -> models.HeuristicAdded | models.HeuristicAlreadyExistsError:
+def add_operator(
+    description: Annotated[str, Field(description="Concise operator meaning. MUST contain a verb")],
+    complexity: Annotated[int, Field(description="Measure of how this operator would complicate the answer")]
+) -> models.OperatorAdded | models.OperatorAlreadyExistsError:
     """
-    heuristic is an operator which can be performed on states in problem-space.
-    FIRST add more simple heuristics like "do X for all" and only then add more specific and more low-level like "change X to Y at position Z"
+    operator is an operator which can be performed on states in problem-space.
+    FIRST add more simple operators like "do X for all" and only then add more specific and more low-level like "change X to Y at position Z"
 
-    You should call `add_transition` to explore new heuristics.
+    You should call `add_transition` to explore new operators.
 
     If map does not contain action you can perform, add it with tool.
-    RETURNS: new heuristic ID. You can further use this heuristic ID in `add_transition`
+    RETURNS: new operator ID. You can further use this operator ID in `add_transition`
 
     EXAMPLES:
     - args: {"description": "swap numbers", "complexity": 1}
@@ -59,7 +59,7 @@ def add_heuristic(
     ERRORS:
     - goal is not set, this method is called before `start_solving_problem`
     """
-    return REGISTRY.add_heuristic(description, complexity)
+    return REGISTRY.add_operator(description, complexity)
 
 
 # @mcp.tool()
@@ -73,27 +73,28 @@ def add_heuristic(
 @mcp.tool()
 def add_transition(
     from_state_id: Annotated[int, Field(description="ID of state from ProblemSpaceMap which should be previously created with `add_transition` or 0")],
-    heuristic_id: Annotated[int, Field(description="ID of heuristic from ProblemSpaceMap which should be previously created with `add_heuristic`")],
+    operator_id: Annotated[int, Field(description="ID of operator from ProblemSpaceMap which should be previously created with `add_operator`")],
     new_state_description: Annotated[str, Field(description="Concise new state meaning")],
 ) -> models.StateAdded | models.StateAlreadyExistsError:
     """
-    State is a position in problem-space. The transition encodes a VALID shift from one state to a NEW state using heuristic. There is no need to add the same state multiple times via this tool.
-    FIRST add more simple states which encode full picture and only then add more specific using more complex heuristics.
+    State is a position in problem-space. The transition encodes a VALID shift from one state to a NEW state using operator. There is no need to add the same state multiple times via this tool.
+    FIRST add more simple states which encode full picture and only then add more specific using more complex operators.
 
     You should call `add_transition` to explore new states.
-    You MUST make decisions based on returned `distance_to_goal`. Low distance means you need make a small transition, slightly changing state. Big distance means you likely need make a big transition, consider new heuristic or another state with lower distance. Distance is estimate, not precise, always double-check yourself.
+    You MUST make decisions based on returned `distance_to_goal`. Low distance means you need make a small transition, slightly changing state. Big distance means you likely need make a big transition, consider new operator or another state with lower distance.
+    Distance is estimate, not precise, sometimes you should consider higher distance to make progress.
 
     Don't make repeating transitions, analyze big picture with `get_insight`
 
-    IMPORTANT: use IDs which are returned from `add_heuristic` or `add_transition` or `get_insight`. Take EXACTLY ONE state from map and heuristic and pass their EXACT IDs to create transition to a new state.
+    IMPORTANT: use IDs which are returned from `add_operator` or `add_transition` or `get_insight`. Take EXACTLY ONE state from map and operator and pass their EXACT IDs to create transition to a new state.
 
     RETURNS: new state ID and estimated distance to goal
     You can further use this new state ID in `add_transition`
 
     EXAMPLES:
-    - args: {"new_state_description": "5 rocks on the left, 10 rocks on the right", "from_state_id": 10, "heuristic_id": 0}
+    - args: {"new_state_description": "5 rocks on the left, 10 rocks on the right", "from_state_id": 10, "operator_id": 0}
       returns: {"id": 40, "distance_to_goal": 14}
-    - args: {"new_state_description": "hanoi disks: [A,B] [C] []", "from_state_id": 2, "heuristic_id": 20}
+    - args: {"new_state_description": "hanoi disks: [A,B] [C] []", "from_state_id": 2, "operator_id": 20}
       returns: {"id": 2, "distance_to_goal": 70}
 
     HINT: If you encounter the same distance or states multiple times, try take a different directions using `get_insight`.
@@ -101,10 +102,10 @@ def add_transition(
     ERRORS:
     - goal is not set, this method is called before `start_solving_problem`
     - from_state_id does not exist in problem space
-    - heuristic_id does not exist in problem space
+    - operator_id does not exist in problem space
     - state with provided `new_state_description` already exists
     """
-    return REGISTRY.add_transition(from_state_id, heuristic_id, new_state_description)
+    return REGISTRY.add_transition(from_state_id, operator_id, new_state_description)
 
 
 @mcp.tool()
@@ -112,7 +113,8 @@ def get_insight() -> models.ProblemSpaceMap:
     """
     Get Map of your task progress with distances to goals. Carefully analyze the `ProblemSpaceMap` returned by the tool.
 
-    You MUST make decisions based on `distance_to_goal` of states. Low distance means you need make a small transition, slightly changing state. Big distance means you need make a big transition, consider new heuristic or another state with lower distance. Distance is estimate, not precise, always double-check yourself.
+    You MUST make decisions based on `distance_to_goal` of states. Low distance means you need make a small transition, slightly changing state. Big distance means you need make a big transition, consider new operator or another state with lower distance.
+    Distance is estimate, not precise, sometimes you should consider higher distance to make progress.
 
     Last item in `transition_history` represents your current state.
     If you are making repeating transitions, analyze big picture with `get_insight`.
@@ -127,7 +129,7 @@ def get_insight() -> models.ProblemSpaceMap:
 
     EXAMPLES:
     - args: {}
-      returns: {"goal_description":"Use numbers 4 4 6 8 and basic arithmetic operations (+ - * /) to obtain 24","states":[{"id":0,"description":"start","distance_to_goal":100.0}],"heuristics":[{"id":0,"description":"put numbers in some order"},{"id":1,"description":"put +"},{"id":2,"description":"add *"},{"id":3,"description":"add /"},{"id":4,"description":"add brackets"},{"id":5,"description":"reorder numbers"}],"transition_history":[]}
+      returns: {"goal_description":"Use numbers 4 4 6 8 and basic arithmetic operations (+ - * /) to obtain 24","states":[{"id":0,"description":"start","distance_to_goal":100.0}],"operators":[{"id":0,"description":"put numbers in some order"},{"id":1,"description":"put +"},{"id":2,"description":"add *"},{"id":3,"description":"add /"},{"id":4,"description":"add brackets"},{"id":5,"description":"reorder numbers"}],"transition_history":[]}
 
     You can further use this IDs from map in `add_transition`
 

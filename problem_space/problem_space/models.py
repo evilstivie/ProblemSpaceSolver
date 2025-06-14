@@ -3,10 +3,10 @@ import typing
 from pydantic import BaseModel, Field
 
 
-class Heuristic(BaseModel):
-    id: int = Field(description="Heuristic unique ID")
-    description: str = Field(description="Human-readable heuristic description")
-    complexity: int = Field(description="Measure of how this heuristic complicates the state")
+class Operator(BaseModel):
+    id: int = Field(description="Operator unique ID")
+    description: str = Field(description="Human-readable operator description")
+    complexity: int = Field(description="Measure of how this operator complicates the state")
 
 
 class State(BaseModel):
@@ -18,14 +18,15 @@ class State(BaseModel):
 class Transition(BaseModel):
     from_state_id: int = Field(description="ID of state to transition from")
     to_state_id: int = Field(description="ID of state to transition to")
-    heuristic_id: int = Field(description="ID of heuristic to use")
+    operator_id: int = Field(description="ID of operator to use")
+    is_new: bool = Field(description="Did this transition made a new state?")
     # distance_delta: float
 
 
 class ProblemSpaceMap(BaseModel):
     goal_description: str
     states: list[State]
-    heuristics: list[Heuristic]
+    operators: list[Operator]
     transition_history: list[Transition]
 
 
@@ -40,10 +41,10 @@ class StateAlreadyExistsError(BaseModel):
     distance_to_goal: float = Field(description="Number representing estimated distance to goal")
 
 
-class HeuristicAdded(BaseModel):
-    id: int = Field(description="Heuristic unique ID")
+class OperatorAdded(BaseModel):
+    id: int = Field(description="Operator unique ID")
 
 
-class HeuristicAlreadyExistsError(BaseModel):
-    error: str = Field(default="heuristic already exists")
-    existing_id: int = Field(description="ID of heuristic which already exists")
+class OperatorAlreadyExistsError(BaseModel):
+    error: str = Field(default="operator already exists")
+    existing_id: int = Field(description="ID of operator which already exists")

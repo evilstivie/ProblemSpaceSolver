@@ -9,11 +9,12 @@ from problem_space.tasks import game24
 
 
 INSTRUCTIONS_PROMPT = """INSTRUCTIONS:
-1. You are professional in reasoning through available tools.
+1. You are professional in reasoning step by step through available tools. You continue reasoning using your previous analysis.
 2. You heavily rely on available tools, your EVERY step should contain tool calls.
 3. Before solving a problem you form strict success criteria and complete set of constraints.
 4. Your reasoning contain ONLY tool calls, no other text.
-5. ALWAYS wrap your final answer with tags <answer>YOUR ANSWER</answer>. Before giving answer you always verify it against criteria.
+5. Before giving answer you always verify it against criteria.
+5. ALWAYS wrap your final answer with tags <answer>YOUR ANSWER</answer>. Tags should contain answer formatted as expected in the task, don't add reasoning between tags.
 """
 
 
@@ -77,6 +78,7 @@ async def run(
                 response_text += "<interrupted>"
                 break
 
+        print()
         messages.append({'role': 'assistant', 'content': response_text, 'tool_calls': [tool_call.model_dump() for tool_call in tool_calls]})
 
         if not response_text and not tool_calls:
@@ -111,17 +113,13 @@ async def run(
 
                 messages.append({
                     'role': 'tool',
-                    'content': json.dumps({
-                        'function_name': tool.function.name,
-                        'request': tool.function.arguments,
-                        'response': json.loads(output[0].text) if output else '',
-                    }),
+                    'content': output[0].text if output else '',
                     'name': tool.function.name,
                 })
                 print(messages[-1])
             except Exception as e:
                 any_tool_failed = True
-                messages.append({'role': 'tool', 'content': f"{tool.function.name} call failed: {str(e)}", 'name': tool.function.name})
+                messages.append({'role': 'tool', 'content': f"{str(e)}", 'name': tool.function.name})
                 print(messages[-1])
 
         # messages.append({'role': 'system', 'content': 'continue, use tool responses'})
@@ -133,11 +131,7 @@ async def run(
 
     messages.append({
         'role': 'tool',
-        'content': json.dumps({
-            'function_name': "problem_space_get_insight",
-            'request': {},
-            'response': json.loads(output[0].text) if output else '',
-        }),
+        'content': output[0].text if output else '',
         'name': "problem_space_get_insight",
     })
 
