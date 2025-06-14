@@ -35,16 +35,5 @@ class StateAdded(BaseModel):
     distance_to_goal: float = Field(description="Number representing estimated distance to goal")
 
 
-class StateAlreadyExistsError(BaseModel):
-    error: str = Field(default="state already exists")
-    existing_id: int = Field(description="ID of state which already exists")
-    distance_to_goal: float = Field(description="Number representing estimated distance to goal")
-
-
 class OperatorAdded(BaseModel):
     id: int = Field(description="Operator unique ID")
-
-
-class OperatorAlreadyExistsError(BaseModel):
-    error: str = Field(default="operator already exists")
-    existing_id: int = Field(description="ID of operator which already exists")

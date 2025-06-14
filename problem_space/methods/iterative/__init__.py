@@ -9,12 +9,15 @@ from problem_space.tasks import game24
 
 
 INSTRUCTIONS_PROMPT = """INSTRUCTIONS:
-1. You are professional in reasoning step by step through available tools. You continue reasoning using your previous analysis.
-2. You heavily rely on available tools, your EVERY step should contain tool calls.
-3. Before solving a problem you form strict success criteria and complete set of constraints.
-4. Your reasoning contain ONLY tool calls, no other text.
-5. Before giving answer you always verify it against criteria.
-5. ALWAYS wrap your final answer with tags <answer>YOUR ANSWER</answer>. Tags should contain answer formatted as expected in the task, don't add reasoning between tags.
+* You are professional in reasoning step by step through available tools. You continue reasoning using your previous analysis.
+* Your reasoning contain ONLY tool calls, no other text.
+* You heavily rely on available tools, your EVERY step should contain tool calls.
+* You heavily rely on your global progress, available in tools.
+* Before solving a problem you form strict success criteria and complete set of constraints and save it using tools.
+* Before giving answer you always verify it against criteria using tools.
+* ALWAYS wrap your final answer with tags <answer>YOUR ANSWER</answer>. Tags should contain answer formatted as expected in the task, don't add reasoning between tags.
+* Do NOT call the same tool multiple times with the same arguments.
+* When the tool provides a result use it to answer the question, do not ignore the result.
 """
 
 
@@ -59,6 +62,7 @@ async def run(
                 # 'repeat_penalty': 1.1,
                 # 'num_predict': 32000,
                 # 'num_ctx': 8096,
+                # "num_ctx": 153600,
                 # 'seed': seed,
                 # 'top_k': 90,
                 # 'top_p': 0.99,
@@ -84,7 +88,6 @@ async def run(
         if not response_text and not tool_calls:
             break
 
-        any_tool_failed = False
         if len(tool_calls) == 0:
             matches = re.findall(r'<answer>(.*?)<\/answer>', response_text, re.DOTALL)
             if len(matches) > 0:
@@ -105,6 +108,7 @@ async def run(
             print(messages[-1])
             continue
 
+        any_tool_failed = False
         for tool in tool_calls:
             try:
                 output = await client.call_tool(tool.function.name, dict(tool.function.arguments))
@@ -119,8 +123,12 @@ async def run(
                 print(messages[-1])
             except Exception as e:
                 any_tool_failed = True
-                messages.append({'role': 'tool', 'content': f"{str(e)}", 'name': tool.function.name})
+                messages.append({'role': 'tool', 'content': f"{tool.function.name}: {str(e)}", 'name': tool.function.name})
                 print(messages[-1])
+
+        if any_tool_failed:
+            messages.append({'role': 'user', 'content': "one of tool calls failed"})
+            print(messages[-1])
 
         # messages.append({'role': 'system', 'content': 'continue, use tool responses'})
         # print(messages[-1])

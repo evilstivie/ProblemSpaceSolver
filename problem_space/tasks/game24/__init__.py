@@ -9,7 +9,9 @@ import pandas as pd
 STANDARD_PROMPT = '''RULES:
 Use numbers and basic arithmetic operations (+ - * /) to obtain 24.
 You MUST use all the numbers from Input in their original quantity.
+You MUST NOT add extra numbers.
 You MAY use one operator multiple times (e.g. use '+' 3 times in expression).
+EACH your step must contain only numbers from Input set in their original quantity.
 Solution always exists.
 
 EXAMPLES:

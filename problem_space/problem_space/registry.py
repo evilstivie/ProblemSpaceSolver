@@ -80,14 +80,14 @@ New state (distance = ?):
         )
         return Answer.model_validate_json(response.message.content or '').distance
 
-    def add_operator(self, description: str, complexity: int) -> models.OperatorAdded | models.OperatorAlreadyExistsError:
+    def add_operator(self, description: str, complexity: int) -> models.OperatorAdded:
         if self.m.goal_description == "unknown":
             raise ValueError("goal is unknown, call `start_solving_problem` first")
 
         for operator in self.m.operators:
             if operator.description == description:
-                return models.OperatorAlreadyExistsError(existing_id=operator.id)
-                # raise ValueError(f"operator with `description`=\"{description}\" already exists and has ID = {operator.id}")
+                # return models.OperatorAlreadyExistsError(existing_id=operator.id)
+                raise ValueError(f"operator with `description`=\"{description}\" already exists and has ID = {operator.id}")
 
         op_id = len(self.m.operators)
         self.m.operators.append(models.Operator(
@@ -99,7 +99,7 @@ New state (distance = ?):
             id=op_id,
         )
 
-    def add_transition(self, from_state_id: int, operator_id: int, new_state_description: str) -> models.StateAdded | models.StateAlreadyExistsError:
+    def add_transition(self, from_state_id: int, operator_id: int, new_state_description: str) -> models.StateAdded:
         if self.m.goal_description == "unknown":
             raise ValueError("goal is unknown, call `start_solving_problem` first")
         if from_state_id >= len(self.m.states):
@@ -117,12 +117,11 @@ New state (distance = ?):
                         is_new=False
                     )
                 )
-                return models.StateAlreadyExistsError(
-                    existing_id=state.id,
-                    distance_to_goal=state.distance_to_goal,
-                )
-
-                # raise ValueError(f"state with `description`=\"{new_state_description}\" already exists and has ID = {state.id}")
+                # return models.StateAlreadyExistsError(
+                #     existing_id=state.id,
+                #     distance_to_goal=state.distance_to_goal,
+                # )
+                raise ValueError(f"state with `description`=\"{new_state_description}\" already exists and has ID = {state.id}")
 
         state_id = len(self.m.states)
         distance = self._evaluate_distance_with_llm(

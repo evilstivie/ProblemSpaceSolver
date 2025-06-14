@@ -18,8 +18,9 @@ def start_solving_problem(
     """
     You MUST first call the `start_solving_problem` tool to set a new task.
     This is crucial to build a correct problem space map and estimate distance to the goal.
+    You MUST heavily rely on problem space for reasoning. Your final answer should fully satisfy the goal.
 
-    You MUST heavily rely on problem space for reasoning
+    CRITICAL: this tool should be called only once.
     """
     REGISTRY.reset(task_description)
 
@@ -36,14 +37,14 @@ def start_solving_problem(
 def add_operator(
     description: Annotated[str, Field(description="Concise operator meaning. MUST contain a verb")],
     complexity: Annotated[int, Field(description="Measure of how this operator would complicate the answer")]
-) -> models.OperatorAdded | models.OperatorAlreadyExistsError:
+) -> models.OperatorAdded:
     """
-    operator is an operator which can be performed on states in problem-space.
-    FIRST add more simple operators like "do X for all" and only then add more specific and more low-level like "change X to Y at position Z"
+    Operator is an action which can be performed on states in problem-space.
 
-    You should call `add_transition` to explore new operators.
+    Useful to:
+    - store possible actions to then select from them using `get_insight`
+    - first add more high-level operators and only after that add more specific and more problem-specific.
 
-    If map does not contain action you can perform, add it with tool.
     RETURNS: new operator ID. You can further use this operator ID in `add_transition`
 
     EXAMPLES:
@@ -75,21 +76,26 @@ def add_transition(
     from_state_id: Annotated[int, Field(description="ID of state from ProblemSpaceMap which should be previously created with `add_transition` or 0")],
     operator_id: Annotated[int, Field(description="ID of operator from ProblemSpaceMap which should be previously created with `add_operator`")],
     new_state_description: Annotated[str, Field(description="Concise new state meaning")],
-) -> models.StateAdded | models.StateAlreadyExistsError:
+) -> models.StateAdded:
     """
-    State is a position in problem-space. The transition encodes a VALID shift from one state to a NEW state using operator. There is no need to add the same state multiple times via this tool.
-    FIRST add more simple states which encode full picture and only then add more specific using more complex operators.
+    State is a position in problem-space. The transition encodes a formally valid shift from one state to a NEW state using operator.
 
-    You should call `add_transition` to explore new states.
-    You MUST make decisions based on returned `distance_to_goal`. Low distance means you need make a small transition, slightly changing state. Big distance means you likely need make a big transition, consider new operator or another state with lower distance.
-    Distance is estimate, not precise, sometimes you should consider higher distance to make progress.
+    Useful to:
+    - explore new states.
+    - apply newly created operators to previously discovered states.
+    - store your position in a problem-space to then see a full picture using `get_insight`.
+    - first add more simple states which encode full picture and only then add more specific using more complex operators.
 
-    Don't make repeating transitions, analyze big picture with `get_insight`
+    Requirements:
+    - operator should be applicable to the state from which you make transition.
+    - result of application of the operator to starting state MUST be exactly the new state.
+    - don't make repeating transitions, analyze big picture with `get_insight`
+    - use IDs which are returned from `add_operator` or `add_transition` or `get_insight`. Take EXACTLY ONE state from map and operator and pass their EXACT IDs to create transition to a new state.
 
-    IMPORTANT: use IDs which are returned from `add_operator` or `add_transition` or `get_insight`. Take EXACTLY ONE state from map and operator and pass their EXACT IDs to create transition to a new state.
+    Distance:
+        You MUST make decisions based on returned `distance_to_goal`. Low distance means you need make a small transition, slightly changing state. Big distance means you likely need make a big transition, consider new operator or another state with lower distance. Distance is estimate, not precise, you should consider higher distance to make progress if you stuck.
 
-    RETURNS: new state ID and estimated distance to goal
-    You can further use this new state ID in `add_transition`
+    RETURNS: new state ID and estimated distance to goal. You can further use this new state ID in `add_transition`
 
     EXAMPLES:
     - args: {"new_state_description": "5 rocks on the left, 10 rocks on the right", "from_state_id": 10, "operator_id": 0}
@@ -97,13 +103,13 @@ def add_transition(
     - args: {"new_state_description": "hanoi disks: [A,B] [C] []", "from_state_id": 2, "operator_id": 20}
       returns: {"id": 2, "distance_to_goal": 70}
 
-    HINT: If you encounter the same distance or states multiple times, try take a different directions using `get_insight`.
-
     ERRORS:
     - goal is not set, this method is called before `start_solving_problem`
     - from_state_id does not exist in problem space
     - operator_id does not exist in problem space
     - state with provided `new_state_description` already exists
+    - operator can't be applied to from_state
+    - result of application of operator to from_state is not equivalent to new_state
     """
     return REGISTRY.add_transition(from_state_id, operator_id, new_state_description)
 
@@ -113,25 +119,23 @@ def get_insight() -> models.ProblemSpaceMap:
     """
     Get Map of your task progress with distances to goals. Carefully analyze the `ProblemSpaceMap` returned by the tool.
 
-    You MUST make decisions based on `distance_to_goal` of states. Low distance means you need make a small transition, slightly changing state. Big distance means you need make a big transition, consider new operator or another state with lower distance.
-    Distance is estimate, not precise, sometimes you should consider higher distance to make progress.
-
-    Last item in `transition_history` represents your current state.
-    If you are making repeating transitions, analyze big picture with `get_insight`.
+    Distance:
+        You MUST make decisions based on `distance_to_goal` of states. Low distance means you need make a small transition, slightly changing state. Big distance means you need make a big transition, consider new operator or another state with lower distance. Distance is estimate, not precise, you should consider higher distance to make progress if you stuck.
 
     Useful when:
     - you think that there is no solution
     - you want to check your goal
     - you want to overview directions you have visited
     - you want to change directions
+    - you have an error from `add_transition` or `add_operator` and need an ID to use
+
+    RETURNS: full problem-space map with objects you previously saved. Last item in `transition_history` represents your current state. If you are making repeating transitions, try to start from another state based on Distance.
 
     HINT: If you encounter the same distance or states multiple times, try take a different directions using `get_insight`.
 
     EXAMPLES:
     - args: {}
       returns: {"goal_description":"Use numbers 4 4 6 8 and basic arithmetic operations (+ - * /) to obtain 24","states":[{"id":0,"description":"start","distance_to_goal":100.0}],"operators":[{"id":0,"description":"put numbers in some order"},{"id":1,"description":"put +"},{"id":2,"description":"add *"},{"id":3,"description":"add /"},{"id":4,"description":"add brackets"},{"id":5,"description":"reorder numbers"}],"transition_history":[]}
-
-    You can further use this IDs from map in `add_transition`
 
     ERRORS:
     - goal is not set, this method is called before `start_solving_problem`
