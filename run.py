@@ -5,6 +5,7 @@ import typing
 
 import asyncclick as click
 import fastmcp
+import graphviz
 
 from problem_space.tasks import game24
 from problem_space.methods import iterative, cot
@@ -86,6 +87,23 @@ async def run_experiment(
                 'is_solved': int(is_solved),
                 'chat': messages,
             }) + "\n")
+
+
+@cli.command()
+@click.argument('input', type=click.File(mode='r'), default='-')
+async def show_graph(input: typing.IO):
+    from problem_space.problem_space import models
+
+    map = models.ProblemSpaceMap.model_validate_json(input.read())
+    g = graphviz.Digraph('problem_space', strict=False)
+
+    for state in map.states:
+        g.node(str(state.id), str(state))
+
+    for i, transition in enumerate(map.transition_history):
+        g.edge(str(transition.from_state_id), str(transition.to_state_id), f"#{i+1} (is_new?: {transition.is_new}): {map.operators[transition.operator_id]}")
+
+    g.render(directory="./graphs/", view=True, format="svg")
 
 
 @cli.command()
