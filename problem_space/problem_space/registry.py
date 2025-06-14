@@ -4,14 +4,10 @@ from pydantic import BaseModel
 from . import models
 
 
-DISTANCE_EVAL_INSTRUCTIONS = """
-INSTRUCTIONS:
-1. Your sole function is to estimate distance to goal.
-2. A lower number means it's closer to the `goal_description`.
-3. Distance is estimate of how the new state is more likely to reach the goal than the previous.
-4. State which uses some incorrect objects which are not stated in goal SHOULD have a very big distance because it is formally incorrect.
-5. Be very strict at checking distance is 0. This should ONLY mean that goal is achieved, e.g. state equivalent to goal.
-6. Max distance is 100.
+DISTANCE_EVAL_INSTRUCTIONS = """INSTRUCTIONS:
+1. Your sole function is to estimate the distance of a 'New state' from a 'Target state'. A lower number (minimum 0) is better. Max distance is 100.
+2. Be very strict at checking RULES provided in goal statement.
+3. Provide ONLY the final estimated distance as a single number.
 """
 
 #  For example, if previous distance is 100, new distance will unlikely be 10.
@@ -23,6 +19,15 @@ class ProblemSpaceRegistry:
         self.reset("unknown")
 
     def reset(self, goal: str):
+        if m := getattr(self, 'm', None):
+            if m.goal_description != "unknown":
+                error_message = (
+                    f"Error: Goal is already set an equals to '{m.goal_description}'."
+                    "You are likely exploring in a circle. "
+                    "Suggestion: Get current problem space using `get_insight` call."
+                )
+                raise ValueError(error_message)
+
         self.m = models.ProblemSpaceMap(
             goal_description=goal,
             states=[
@@ -87,7 +92,14 @@ New state (distance = ?):
         for operator in self.m.operators:
             if operator.description == description:
                 # return models.OperatorAlreadyExistsError(existing_id=operator.id)
-                raise ValueError(f"operator with `description`=\"{description}\" already exists and has ID = {operator.id}")
+
+                error_message = (
+                    f"Error: The operator '{description}' already exists with ID {operator.id}. "
+                    "You are likely exploring in a circle. "
+                    "Suggestion: Try applying THIS operator to a state using `add_transition`, or use `get_insight` to find a completely new path with a lower distance."
+                )
+
+                raise ValueError(error_message)
 
         op_id = len(self.m.operators)
         self.m.operators.append(models.Operator(
@@ -121,7 +133,14 @@ New state (distance = ?):
                 #     existing_id=state.id,
                 #     distance_to_goal=state.distance_to_goal,
                 # )
-                raise ValueError(f"state with `description`=\"{new_state_description}\" already exists and has ID = {state.id}")
+                error_message = (
+                    f"Error: The state '{new_state_description}' already exists with ID {state.id}. "
+                    "You are likely exploring in a circle. "
+                    "Suggestion: Try making a DIFFERENT transition, or use `get_insight` to find a completely new path with a lower distance."
+                )
+
+                raise ValueError(error_message)
+                # raise ValueError(f"state with `description`=\"{new_state_description}\" already exists and has ID = {state.id}")
 
         state_id = len(self.m.states)
         distance = self._evaluate_distance_with_llm(

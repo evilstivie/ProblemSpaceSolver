@@ -13,14 +13,17 @@ REGISTRY = registry.ProblemSpaceRegistry()
 
 @mcp.tool()
 def start_solving_problem(
-    task_description: Annotated[str, Field(description="Full task description with success criteria and complete set of constraints. May be long")],
+    task_description: Annotated[str, Field(description="Full task description with success criteria and complete set of constraints (RULES). May be long, should be self-sufficient and describe set of task rules. You MUST NOT reference external rules here, inine full rule definitions. This is CRUCIAL for correct distance estimation. The distance is estimated based on this parameter")],
 ) -> None:
     """
     You MUST first call the `start_solving_problem` tool to set a new task.
     This is crucial to build a correct problem space map and estimate distance to the goal.
     You MUST heavily rely on problem space for reasoning. Your final answer should fully satisfy the goal.
 
-    CRITICAL: this tool should be called only once.
+    CRITICAL: this tool MUST be called only once in the beginning of reasoning process.
+
+    Errors:
+    - this tool is used more than once.
     """
     REGISTRY.reset(task_description)
 

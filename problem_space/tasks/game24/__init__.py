@@ -7,12 +7,13 @@ import pandas as pd
 
 # 5-shot
 STANDARD_PROMPT = '''RULES:
-Use numbers and basic arithmetic operations (+ - * /) to obtain 24.
-You MUST use all the numbers from Input in their original quantity.
-You MUST NOT add extra numbers.
-You MAY use one operator multiple times (e.g. use '+' 3 times in expression).
-EACH your step must contain only numbers from Input set in their original quantity.
-Solution always exists.
+The main goal is to reach the target '24' using ALL numbers from the input set exactly once using basic arithmetic operations (+ - * /).
+
+CRITICALLY, state is analyzed based on these rules:
+    - **RULE A (GOAL ACHIEVED):** If the 'New state' is a valid mathematical expression that evaluates to 24 AND uses a plausible number of the input digits, the distance is EXACTLY 0.
+    - **RULE B (NUMERICAL CLOSENESS):** If the 'New state' is a valid expression that does NOT evaluate to 24, calculate its result. The base distance should be `abs(result - 24)`.
+    - **RULE C (EFFICIENCY PENALTY):** ADD A PENALTY to the distance based on how many numbers from the input set were used. A state that uses 3 numbers but is still far from 24 is WORSE than a state that uses 2 numbers and is equally far. For example, `(8*4)-6=26` (3 numbers used, distance ~2) is a worse path than `8*4=32` (2 numbers used, distance ~8). Add a penalty of `10 * (number of digits used - 2)`.
+    - **RULE D (NON-NUMERIC STATES):** If the 'New state' is not a full expression (e.g., 'numbers 8 and 4 are combined'), estimate distance based on progress. A state with 2 numbers combined might be 75, 3 numbers combined might be 50. The initial state is 100.
 
 EXAMPLES:
 Input: 4 4 6 8
